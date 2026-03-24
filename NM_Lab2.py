@@ -1,4 +1,5 @@
 from copy import deepcopy
+import numpy as np
 
 A = [
     [12, -3, -1, 3],
@@ -9,10 +10,13 @@ A = [
 b = [-26, -55, -58, -24]
 n = 4
 
-def solve(A_, b_):
+def solve(A_, b_, f=True):
     A = deepcopy(A_)
     b = deepcopy(b_)
     n = len(A)
+    Q = [[0] * n for i in range(n)]
+    for i in range(n):
+        Q[i][i] = 1
     for l in range(n - 1):
         y = [A[k][l] for k in range(l, n)]
         if all([v == 0 for v in y[1:]]):
@@ -43,9 +47,29 @@ def solve(A_, b_):
             for j in range(n):
                 A[i][j] = sum([U[i][t] * AA[t][j] for t in range(n)])
 
+        QQ = deepcopy(Q)
+        for i in range(n):
+            for j in range(n):
+                Q[i][j] = sum([U[i][t] * QQ[t][j] for t in range(n)])
+
         bb = deepcopy(b)
         for i in range(n):
             b[i] = sum([U[i][j] * bb[j] for j in range(n)])
+
+    if f:
+        print("Ортогональная")
+        for line in Q:
+            for el in line:
+                print(f"{' ' if el > 0 else ''}{el:.1f}", end=' ')
+            print()
+        print()
+
+        print("Верхнетреугольная")
+        for line in A:
+            for el in line:
+                print(f"{' ' if el > 0 else ''}{el:.1f}", end=' ')
+            print()
+        print()
         
     x = [0] * n
     for i in range(n - 1, -1, -1):
@@ -58,7 +82,7 @@ def inv(B):
     X = [[0] * n for _ in range(n)]
     for i in range(n):
         f = [1 if i == j else 0 for j in range(n)]
-        x = solve(B, f)
+        x = solve(B, f, False)
         for j in range(n):
             X[j][i] = x[j]
     return X
@@ -66,34 +90,24 @@ def inv(B):
 
 def sor(A_, b_, x_, eps, w):
     A = deepcopy(A_)
-    b = deepcopy(b_)
+    f = deepcopy(b_)
     x = deepcopy(x_)
     n = len(b)
-    
-    B = [[0] * n for _ in range(n)]
-    for i in range(n):
-        for j in range(n):
-            B[i][j] = -A[i][j] / A[i][i]
-    c = [0] * n
-    for i in range(n):
-        c[i] = b[i] / A[i][i]
+
+    cnt = 0
 
     while True:
-        R = [0] * n
-        R_max = 0
-        i_max = 0
-        for i in range(n):
-            R[i] = c[i] - x[i] + sum([B[i][j] * x[j] for j in range(n) if i != j])
-            if abs(R[i]) > R_max:
-                R_max = abs(R[i])
-                i_max = i
-    
-        x[i_max] += w * R[i_max]
+        cnt += 1
+        xx = deepcopy(x)
 
-        if abs(w * R[i_max]) < eps:
+        for i in range(n):
+            x[i] = -w * sum([A[i][j] / A[i][i] * x[j] for j in range(i)]) + (1 - w) * xx[i] - \
+                w * sum([A[i][j] / A[i][i] * xx[j] for j in range(i + 1, n)]) + w * f[i] / A[i][i]
+
+        if sum([abs(x[i] - xx[i]) for i in range(n)]) < eps:
             break
 
-    return x
+    return x, cnt
 
 
 x = solve(A, b)
@@ -111,10 +125,11 @@ for v in r:
 print()
 
 x = [int(v) - 1 if v < 0 else int(v) for v in x]
-x = sor(A, b, x, 1e-6, 1.5)
+x, cnt = sor(A, b, x, 1e-6, 1.2)
 print("Решение СЛАУ:")
 for v in x:
     print(f'{v:.10f}')
+print("Число шагов:", cnt)
 print()
 
 r = [0] * n
@@ -127,5 +142,5 @@ print()
 
 A_inv = inv(A)
 M = max([sum([abs(A[i][j]) for i in range(n)]) for j in range(n)]) * max([sum([abs(A_inv[i][j]) for i in range(n)]) for j in range(n)])
-print("Число обусловленности матрицы:", M)
+print("Число обусловленности матрицы:", M, np.linalg.cond(A, p=1))
 
